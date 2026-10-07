@@ -1,205 +1,123 @@
-# IMU Double-Tap Recognition on PC
+# IMU Double-Tap Recognition
 
-Recognize **double-tap** gestures on a laptop/PC chassis using IMU (accelerometer + gyroscope) data. This project provides:
+Detect left and right double taps on a laptop or PC chassis from a six-axis IMU stream: three accelerometer channels and three gyroscope channels. The detector is designed for online use: every prediction uses only current and previous samples.
 
-1. A **physical/mathematical model** of tap-induced vibrations
-2. A **causal CNN + GRU** neural network for streaming inference
-3. **Interactive labeling tools** for collected IMU recordings
-4. Training on **recorded labels** or **synthetic simulation**
+The repository contains the complete iteration workflow: collect and label recordings, train GRU or LSTM models, evaluate full-recording behavior, compare saved runs, and export a streaming model for HarmonyOS.
 
-## Mathematical Model (Summary)
+## Current Experiment Result
 
-See [docs/mathematical_model.md](docs/mathematical_model.md) for the full derivation.
+The current selected experiment is a causal CNN with a one-layer, 64-unit LSTM trained with an 8-frame delayed target (`lstm64d8`). Its chosen operating point uses a 12-frame look-ahead policy with left/right thresholds of `0.50 / 0.50`.
 
-A double-tap produces two impulsive mechanical responses within an inter-tap interval \(\Delta t \in [T_{\min}, T_{\max}]\). Each tap excites damped oscillations in the chassis; the IMU observes:
-
-\[
-\mathbf{y}(t) = \mathbf{R}(\boldsymbol{\theta})\mathbf{g} + \sum_{k=1}^{2} h(t - t_k; \mathbf{p}_k) + \boldsymbol{\eta}(t)
-\]
-
-where \(\mathbf{y} = [a_x, a_y, a_z, \omega_x, \omega_y, \omega_z]^\top\).
-
-## Project Structure
-
-```
-TapRecognition/
-├── docs/mathematical_model.md   # Full physical & detection model
-├── data/
-│   ├── train_data/              # Training recordings + sidecar .txt labels
-│   └── valid_data/              # Validation recordings + sidecar .txt labels
-├── tools/
-│   ├── label_imu.py             # Interactive single-file labeling GUI
-│   ├── label_all_imu.py         # Batch labeling for all CSVs under data/
-│   ├── export_for_harmony.py    # Export checkpoint to ONNX for HarmonyOS
-│   └── convert_to_ms.ps1        # ONNX → .ms via MindSpore Lite converter
-├── tap_recognition/
-│   ├── config.py                # Hyperparameters (TrainConfig dataclasses)
-│   ├── physics.py               # Tap signal synthesis (IMUSimulator)
-│   ├── labels.py                # Gaussian second-tap soft labels
-│   ├── recording.py             # CSV loading, JSON annotation helpers
-│   ├── dataset.py               # IMUDoubleTapDataset + RecordedIMUDataset
-│   ├── model.py                 # Causal CNN + GRU
-│   └── inference.py             # Streaming online detector
-├── train.py                     # Training script
-├── demo.py                      # End-to-end synthetic demo
-├── checkpoints/                 # Saved model weights (best.pt, last.pt)
-└── requirements.txt
-```
+This is a validation-set selection, not an independent test result. The detailed evidence, retained metrics, and limitations are in [`summary/README.md`](summary/README.md).
 
 ## Quick Start
 
-Requires Python 3.8+ with PyTorch.
+Create and activate a Python environment, then install the repository dependencies:
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-pip install pandas   # required for tools/label_imu.py
 ```
 
-### 1. Label collected IMU data
+Open the notebooks with the `.venv` Python kernel. The standard experiment loop is:
 
-Recordings are CSV files with columns `timestamp_ms`, `acc_x/y/z`, `gyro_x/y/z`, `segment_index`, etc.
+1. Prepare and auto-label recordings as described in [`docs/data-collection-and-labeling.md`](docs/data-collection-and-labeling.md).
+2. Train one candidate in [`main_notebooks/training_gru.ipynb`](main_notebooks/training_gru.ipynb) or [`main_notebooks/training_lstm.ipynb`](main_notebooks/training_lstm.ipynb).
+3. Set `RUN_DIR` and run [`main_notebooks/evaluate.ipynb`](main_notebooks/evaluate.ipynb) to create the full metric and threshold exports for that run.
+4. Add the exported run to `RUNS` in [`main_notebooks/compare_models.ipynb`](main_notebooks/compare_models.ipynb) and compare compatible experiments side by side.
 
-**Single file** — open the interactive GUI, drag on either plot to select each double-tap region, then close the window to save:
+The notebooks do not replace each other: training creates one candidate, evaluation measures it, and comparison reads multiple completed evaluations. See [`main_notebooks/README.md`](main_notebooks/README.md) for the complete notebook workflow.
+
+## Data Collection And Labeling
+
+Recordings are divided into consecutive collection segments. The newer strict collection mode asks the participant to perform the double tap inside a designated time window within every segment. The auto-labeler receives the same window with:
 
 ```bash
-python tools/label_imu.py data/train_data/imu_ZR_knock_twice_20260712_103508.csv
+./.venv/bin/python tools/auto_label_imu.py \
+  data_02_10_26/train_data data_02_10_26/valid_data \
+  --strict-spike-window-ms <START_MS> <END_MS>
 ```
 
-**All files under `data/`** — batch process by action type:
+For `imuStrict_*` recordings, this option is required. It requires the first detected tap to occur after `START_MS` and the second detected tap before `END_MS`, separately for every segment. This prevents incidental movement outside the intended collection interval from becoming the label.
+
+Regular `imu_*` recordings retain unrestricted pairing. Full data layout, label formats, review, and exclusions are documented in [`docs/data-collection-and-labeling.md`](docs/data-collection-and-labeling.md).
+
+## Architecture
+
+```text
+IMU sample stream [T, 6]
+        |
+        v
+high-pass preprocessing
+        |
+        v
+causal CNN: 32 channels, kernel 5, dilations 1/2/4
+        |
+        v
+GRU or unidirectional LSTM recurrent head
+        |
+        v
+per-frame logits: none / left / right
+        |
+        v
+threshold, look-ahead, prior-tap check, refractory postprocessing
+```
+
+The CNN is left-padded and the recurrent head is unidirectional. The model supports both the original GRU and configurable LSTM heads. Read [`docs/model-and-inference.md`](docs/model-and-inference.md) for streaming state, target labels, checkpoint metadata, and known limitations.
+
+The physical IMU and chassis-vibration formulation is in [`docs/mathematical_model.md`](docs/mathematical_model.md).
+
+## Repository Map
+
+```text
+TapRecognition/
+├── data_02_10_26/          # Current train/validation recording set
+├── docs/                   # Focused technical documentation
+├── main_notebooks/         # Training, evaluation, and comparison notebooks
+├── notebooks_analysis/     # Read-only data, label, and streaming analyses
+├── tap_recognition/        # Dataset, labels, models, and online inference
+├── tools/                  # Auto-labeling, export, split, and verification tools
+├── train.py                # CLI training entry point for GRU or LSTM
+├── demo.py                 # End-to-end demonstration and visualization
+├── summary/                # Detailed internal experiment record
+└── requirements.txt
+```
+
+## Command-Line Entry Points
+
+The notebooks are the preferred path for controlled delayed-target experiments. The shared script remains useful for regular training:
 
 ```bash
-python tools/label_all_imu.py --skip-existing
+# GRU
+./.venv/bin/python train.py --out-dir checkpoints_gru
+
+# One-layer LSTM with 64 hidden units
+./.venv/bin/python train.py \
+  --recurrent-type lstm --recurrent-hidden 64 --recurrent-layers 1 \
+  --out-dir checkpoints_lstm64
+
+# Run the streaming inference demonstration
+./.venv/bin/python -m tap_recognition.inference --checkpoint checkpoints/best.pt
 ```
 
-| Recording type | Filename pattern | Label file |
-|----------------|------------------|------------|
-| Double-tap | `*knock_twice*` | Sidecar `.txt` with trigger frames (interactive GUI) |
-| Single-tap | `*knock_once*` | Empty `.txt` (negative class) |
-| Arbitrary motion | `*arbitrary*` | Empty `.txt` (negative class) |
+The script's configuration defaults are defined in `tap_recognition/config.py`. Checkpoints store model type and architecture metadata so `tap_recognition.model_factory.build_model()` can load GRU, LSTM, and legacy GRU checkpoints.
 
-Labels are saved as a **sidecar text file** next to each CSV:
+## Further Documentation
 
-```
-data/train_data/imu_ZR_knock_twice_20260712_103508.csv
-data/train_data/imu_ZR_knock_twice_20260712_103508.txt
-```
+| Document | Contents |
+| --- | --- |
+| [`docs/data-collection-and-labeling.md`](docs/data-collection-and-labeling.md) | Recording format, strict collection window, auto-labeling, audits, and exclusions. |
+| [`docs/training-and-evaluation.md`](docs/training-and-evaluation.md) | Controlled experiment workflow, delayed targets, metrics, threshold selection, and external testing. |
+| [`docs/model-and-inference.md`](docs/model-and-inference.md) | CNN/GRU/LSTM architecture, causal streaming state, checkpoints, and online postprocessing. |
+| [`docs/harmonyos-deployment.md`](docs/harmonyos-deployment.md) | Streaming ONNX export and MindSpore Lite conversion requirements. |
+| [`main_notebooks/README.md`](main_notebooks/README.md) | Detailed guide to training, evaluation, and comparison notebooks. |
+| [`notebooks_analysis/README.md`](notebooks_analysis/README.md) | Detailed guide to dataset, label, and state-analysis notebooks. |
+| [`summary/README.md`](summary/README.md) | Detailed working record of the completed labeling, delay, augmentation, and LSTM experiments. |
 
-Each line in a double-tap label file is `frame_index, action_label` (e.g. `160, 1`), where `frame_index` is the global row index in the CSV and `action_label = 1` marks the second tap.
+## Limitations
 
-The GUI plots **ACC energy delta** and **GYRO energy**, picks the minimum normalized gyro energy within each dragged span as the trigger frame, and marks it with a red vertical line.
-
-> **Windows path note:** use raw strings for backslash paths in `label_imu.py`, e.g. `r'data\train_data\file.csv'`, to avoid `\t` being parsed as a tab character.
-
-### 2. Train on labeled recordings
-
-Place training CSVs in `data/train_data/` and validation CSVs in `data/valid_data/`. Edit defaults in `tap_recognition/config.py` if needed (`TrainConfig`, `DataConfig`, etc.).
-
-```bash
-python train.py
-```
-
-For synthetic data, set `DataConfig.mode = "synthetic"` in `tap_recognition/config.py`.
-
-Checkpoints are written to `checkpoints/best.pt` and `checkpoints/last.pt`.
-
-### 4. Run inference
-
-```bash
-python -m tap_recognition.inference --checkpoint checkpoints/best.pt
-```
-
-Or run the full synthetic pipeline demo:
-
-```bash
-python demo.py
-```
-
-## Model Architecture
-
-```
-IMU window [B, T, 6]
-    │
-    ▼
-Causal Conv1D stack (left-padded, no future leakage)
-    │
-    ▼
-GRU (maintains hidden state for streaming)
-    │
-    ▼
-Sigmoid → P(double-tap at current frame)
-```
-
-**Causality** is enforced by:
-
-- Left-only padding in all conv layers
-- GRU processing strictly in temporal order
-- Online inference updates one sample at a time with persistent GRU state
-
-## Configuration
-
-Hyperparameters are defined as dataclasses in `tap_recognition/config.py`:
-
-| Class | Contents |
-|-------|----------|
-| `DataConfig` | Dataset mode, paths, window size, negative sampling |
-| `LabelConfig` | Gaussian soft-label parameters |
-| `ModelConfig` | CNN + GRU architecture |
-| `TrainingConfig` | Epochs, batch size, learning rate, early stopping |
-| `TrainConfig` | Top-level wrapper (seed, device, out_dir, nested configs) |
-
-## Deploy to HarmonyOS (`.pth` → `.ms`)
-
-HarmonyOS edge inference uses **MindSpore Lite** `.ms` models. The official converter is `converter_lite` ([MindSpore Lite 文档](https://www.mindspore.cn/lite/docs/zh-CN/master/converter/converter_tool.html)).
-
-> **Note:** Training checkpoints (`best.pt`) store weights + config, not a deployable graph. Convert in two steps: **PyTorch → ONNX → MS**.
-
-### Step 1: Export ONNX from checkpoint
-
-```bash
-python tools/export_for_harmony.py --checkpoint checkpoints/best.pt --output checkpoints/tap_recognition.onnx
-```
-
-Input shape: `[1, 64, 6]` (batch, time, IMU channels). Outputs: `logits [1, 64, 1]`, `h_n` (GRU state).
-
-Requires: `pip install onnx` (do **not** install `onnxscript` on Python 3.8).
-
-### Step 2: Convert ONNX to `.ms`
-
-1. Download **MindSpore Lite Windows x64** from the [official download page](https://www.mindspore.cn/lite/docs/zh-CN/master/use/downloads.html) (e.g. `mindspore-lite-2.9.0-win-x64.zip`).
-2. Extract the package and add `tools/converter/lib` to `PATH`.
-3. Run:
-
-```powershell
-# Windows
-$env:PATH = "<MSLITE_ROOT>\tools\converter\lib;$env:PATH"
-<MSLITE_ROOT>\tools\converter\converter\converter_lite.exe `
-  --fmk=ONNX `
-  --modelFile=checkpoints/tap_recognition.onnx `
-  --outputFile=checkpoints/tap_recognition `
-  --inputShape="imu:1,64,6"
-```
-
-Or use the helper script:
-
-```powershell
-.\tools\convert_to_ms.ps1 -MsLiteRoot "<extracted_mindspore_lite_folder>"
-```
-
-Success prints `CONVERT RESULT SUCCESS:0` and produces `checkpoints/tap_recognition.ms`.
-
-### Alternative: direct PyTorch conversion (Linux only)
-
-Prebuilt Windows packages **do not** support `--fmk=PYTORCH`. On Linux you must compile MindSpore Lite from source with:
-
-```bash
-export MSLITE_ENABLE_CONVERT_PYTORCH_MODEL=on
-export LIB_TORCH_PATH="/path/to/libtorch"
-```
-
-Then export a TorchScript model (not a training checkpoint) and run `converter_lite --fmk=PYTORCH`.
-
-### HarmonyOS inference
-
-Load `tap_recognition.ms` in your HarmonyOS app via the MindSpore Lite C++/ArkTS API. See [HarmonyOS MindSpore Lite 模型转换](https://www.seaxiang.com/blog/vkzEm4) for the end-to-end deployment flow.
-
----
+- Reported model-selection metrics use the validation recordings and threshold tuning; they are not independent test estimates.
+- The selected model and final thresholds should be frozen before running an external test.
+- The CNN currently retains BatchNorm. Its training-time normalization behavior is a future controlled experiment, not a claimed solved causality issue.
+- Retained experiment CSVs do not replace preserving the selected checkpoint for deployment.

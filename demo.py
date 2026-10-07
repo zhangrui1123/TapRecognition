@@ -120,7 +120,7 @@ def plot_detailed_pipeline(
     # --- Data collection ---
     ax.text(1.2, 8.85, "1. Data collection", fontsize=10, fontweight="bold", color="#333")
     box(0.3, 7.5, 2.4, 0.9, "IMU CSV\n6-ch @ 100 Hz", "#fff3e0", "#e69138")
-    box(3.1, 7.5, 2.6, 0.9, "label_imu.py\nACC Δ + GYRO energy", "#fff3e0", "#e69138")
+    box(3.1, 7.5, 2.6, 0.9, "auto_label_imu.py\nACC peak pairing", "#fff3e0", "#e69138")
     box(6.1, 7.5, 2.5, 0.9, "Sidecar .txt\ntrigger frame n₂", "#fff3e0", "#e69138")
     arrow(2.7, 7.95, 3.1, 7.95)
     arrow(5.7, 7.95, 6.1, 7.95)
@@ -224,7 +224,7 @@ def export_to_mindspore(
     print("Exporting checkpoint to ONNX for MindSpore Lite...")
     export_cmd = [
         sys.executable,
-        "tools/export_for_harmony.py",
+        "tools/export_step_for_harmony.py",
         "--checkpoint",
         str(checkpoint),
         "--output",

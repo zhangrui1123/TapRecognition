@@ -1,0 +1,560 @@
+{
+  "created_utc": "2026-09-24T04:20:36.685005+00:00",
+  "checkpoint": "checkpoints/best.pt",
+  "checkpoint_sha256": "dca066485d710ff5700c145c2c1736ccf2bf538cd8b499f04bc2e3ea768837ed",
+  "checkpoint_epoch": 5,
+  "checkpoint_config": {
+    "seed": 42,
+    "device": "auto",
+    "out_dir": "checkpoints",
+    "init_checkpoint": "checkpoints/best_pre_finetune.pt",
+    "freeze_except_last": false,
+    "data": {
+      "mode": "recorded",
+      "train_dir": "data/train_data",
+      "val_dir": "data/valid_data",
+      "window_samples": 300,
+      "sample_rate": 100.0,
+      "highpass": true,
+      "negative_windows_per_file": 20,
+      "trigger_context_samples": 200,
+      "exclusion_margin": 200,
+      "dt_min": 0.12,
+      "dt_max": 0.45,
+      "synthetic_samples": 8000,
+      "val_split": 0.15
+    },
+    "labels": {
+      "sigma": 0.04,
+      "peak_offset": 0.05,
+      "half_frames": 10
+    },
+    "model": {
+      "input_dim": 6,
+      "num_classes": 3,
+      "cnn_channels": 32,
+      "gru_hidden": 64,
+      "gru_layers": 1,
+      "kernel_size": 5,
+      "dilations": [
+        1,
+        2,
+        4
+      ],
+      "dropout": 0.1
+    },
+    "training": {
+      "epochs": 50,
+      "batch_size": 16,
+      "lr": 0.0001,
+      "weight_decay": 0.0001,
+      "grad_clip": 1.0,
+      "prediction_threshold": 0.5,
+      "event_loss_weight": 15.0,
+      "neg_window_weight": 1.5,
+      "num_workers": 0,
+      "early_stopping": {
+        "enabled": true,
+        "patience": 10,
+        "min_delta": 0.001,
+        "monitor": "val_window_acc"
+      }
+    }
+  },
+  "settings": {
+    "threshold": 0.5,
+    "event_loss_weight": 15.0,
+    "neg_window_weight": 1.5,
+    "tolerance_sec": 0.15,
+    "look_ahead_sec": 0.12,
+    "refractory_sec": 0.5
+  },
+  "seed": 42,
+  "bootstrap_draws": 2000,
+  "device": "cpu",
+  "threads": 1,
+  "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+  "python_executable": "/home/aprohack/desktop/work/tap-project/project/tapRecognitionRui/TapRecognition/.venv/bin/python",
+  "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "packages": {
+    "torch": "2.14.0",
+    "numpy": "2.5.3",
+    "pandas": "3.0.6",
+    "scipy": "1.18.1",
+    "matplotlib": "3.11.2",
+    "ipykernel": "7.3.0"
+  },
+  "git_commit": "6ba5344e230dd94055cb0b8d1e4acf7d33161197",
+  "git_status": "?? notebooks/03_state_reset_vs_continuous.ipynb\n?? notebooks/README.md\n?? notebooks/requirements.txt\n?? notebooks/results/\n?? notebooks/state_reset_analysis.py\n",
+  "inputs": [
+    {
+      "path": "data/train_data/imu_CC_arbitrary_20260901_154914.csv",
+      "sha256": "65f61814801dccbfa44c1a9e26b2635965408827bdec16e29555f7bb41b6e012"
+    },
+    {
+      "path": "data/train_data/imu_CC_arbitrary_20260901_154914.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/train_data/imu_CC_knock_twice_left_20260901_153013.csv",
+      "sha256": "bfbf6cf17d759a79bd7b3b1e2044dccd310154886fbe23e222400254637e4c3a"
+    },
+    {
+      "path": "data/train_data/imu_CC_knock_twice_left_20260901_153013.txt",
+      "sha256": "aabd744683f335b872306e851b078b64e757d8fa3d6037adf513ad15ef9515ac"
+    },
+    {
+      "path": "data/train_data/imu_CC_knock_twice_left_20260901_153310.csv",
+      "sha256": "f9da37ff8b83e18ce6cf416febf2e7c1ae947328ccce9bf11bfc3f9f1bf83c27"
+    },
+    {
+      "path": "data/train_data/imu_CC_knock_twice_left_20260901_153310.txt",
+      "sha256": "45771d55c815d8695b1a77cf7d6b257816fe182bdb74a67e43ebb8f16e6ea933"
+    },
+    {
+      "path": "data/train_data/imu_CC_knock_twice_right_20260901_153123.csv",
+      "sha256": "add7b1d335ac39c13960a8ed8b1e69afc33f0c64280ca1db58c53b8fa6b9a85f"
+    },
+    {
+      "path": "data/train_data/imu_CC_knock_twice_right_20260901_153123.txt",
+      "sha256": "49623c9df2f0d5c8e57c8c934b45a7ed77b2d01cc072f236fd34b74c7df80cc7"
+    },
+    {
+      "path": "data/train_data/imu_CC_knock_twice_right_20260901_153642.csv",
+      "sha256": "2dcc78588a9722a7bbe21b528ed1445f1ff344be8c284655baf60bbb7f938d20"
+    },
+    {
+      "path": "data/train_data/imu_CC_knock_twice_right_20260901_153642.txt",
+      "sha256": "e27c46aa0003102af3479c1058817cb9511bd9418d9af779686817ee99207331"
+    },
+    {
+      "path": "data/train_data/imu_CC_pick_place_20260901_154749.csv",
+      "sha256": "23148261a3a96cb2ab365d0b6843d21bb92f8750ba251bd8b4dfa561822c937e"
+    },
+    {
+      "path": "data/train_data/imu_CC_pick_place_20260901_154749.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/train_data/imu_CCx_adjust_grip_20260901_154257.csv",
+      "sha256": "7cb1c0dea36192c4dcf6877ac59082f6191630c508643dd9062bf74555a5cde6"
+    },
+    {
+      "path": "data/train_data/imu_CCx_adjust_grip_20260901_154257.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/train_data/imu_JYH_knock_twice_left_20260916_142814.csv",
+      "sha256": "e44c931d1c7a85b1c018bb9d1af5ac2b7c575a9fa93ab44ad3fbd6ac7b4fdbc4"
+    },
+    {
+      "path": "data/train_data/imu_JYH_knock_twice_left_20260916_142814.txt",
+      "sha256": "2cb966239049d9fb04e03590ce4e91c4747037562884a1d0554057043ef4b1c9"
+    },
+    {
+      "path": "data/train_data/imu_JYH_knock_twice_right_20260916_142927.csv",
+      "sha256": "d33bbd2c7391c786037573e734b7cf3a74ad8d02a996ef55c5feeadf493a7fd1"
+    },
+    {
+      "path": "data/train_data/imu_JYH_knock_twice_right_20260916_142927.txt",
+      "sha256": "a454fea989b7030b21153e249d1a3c5d0fa4f551566a3138bffc5d42582b8d0f"
+    },
+    {
+      "path": "data/train_data/imu_TY_knock_once_20260831_141648.csv",
+      "sha256": "7ded2272624f70e1c475b7a938d4eb00390213d49e1996f65054b8b65769eb6c"
+    },
+    {
+      "path": "data/train_data/imu_TY_knock_once_20260831_141648.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/train_data/imu_TY_knock_twice_left_20260831_141050.csv",
+      "sha256": "ef7faa067eb3d2efdefe4d37db83ddd9574926cdf074c252ffd0255e97487ba0"
+    },
+    {
+      "path": "data/train_data/imu_TY_knock_twice_left_20260831_141050.txt",
+      "sha256": "d75a9d53b9efffefc7e0ddc0e4e4b9e593b124a947c3f2d1db69aaa19d2d518a"
+    },
+    {
+      "path": "data/train_data/imu_TY_knock_twice_left_20260831_141253.csv",
+      "sha256": "ecc596946538d15f34722af5d94e3cab5d52c2e11bebdcd71ee0910881015dfe"
+    },
+    {
+      "path": "data/train_data/imu_TY_knock_twice_left_20260831_141253.txt",
+      "sha256": "c11d2b161bf5ec3e5446aeda6e934f5aec653aaecd13ed381f37015ad84e8ee9"
+    },
+    {
+      "path": "data/train_data/imu_TY_knock_twice_right_20260831_141408.csv",
+      "sha256": "0a19d23837b62b3a239c8367b2aff0303f0f8f20b9b062794bb8ba28a0ad6a23"
+    },
+    {
+      "path": "data/train_data/imu_TY_knock_twice_right_20260831_141408.txt",
+      "sha256": "dff66e840faedca86c855a5053c0566f396ce59e7b592ad7370a64285c7493fa"
+    },
+    {
+      "path": "data/train_data/imu_TY_knock_twice_right_20260831_141522.csv",
+      "sha256": "b06f109eb9635d358df6492c91118e61d6ab1eaaa545208baf40a797d21065f2"
+    },
+    {
+      "path": "data/train_data/imu_TY_knock_twice_right_20260831_141522.txt",
+      "sha256": "4ceb8985c3ff02a28afaae30ddf1c3dce785ff86f56087e11f0d7bfdd235abf3"
+    },
+    {
+      "path": "data/train_data/imu_YJ_adjust_grip_20260901_160339.csv",
+      "sha256": "4dd65f8f451ff9820773f4827814f4af8020cef16ebf2028059d9c25ef445354"
+    },
+    {
+      "path": "data/train_data/imu_YJ_adjust_grip_20260901_160339.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/train_data/imu_YJ_arbitrary_20260831_140339.csv",
+      "sha256": "ff5e0fb35825d7e8c91b07a39b463c863130ee746c2e65624329c6d0e85465b1"
+    },
+    {
+      "path": "data/train_data/imu_YJ_arbitrary_20260831_140339.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_once_20260831_140459.csv",
+      "sha256": "4346ca00f18c46663e964100a1c03b279932b7d19ff8d18a30b79bf4c29b10ab"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_once_20260831_140459.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_once_20260901_160144.csv",
+      "sha256": "d1f1f048a9d9ae72d101c0ab05a6967e6a6e0bfb601d5efb509570fad0edf642"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_once_20260901_160144.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_left_20260831_111248.csv",
+      "sha256": "c36a7a214809e89c3a2fa1bd94b9417810c073f25bea0d0106972683b48c6a6d"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_left_20260831_111248.txt",
+      "sha256": "25f1a687aad9ea1c981bc4cc8baec75eb00bf3defffc97249858affe73fcba33"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_left_20260831_133418.csv",
+      "sha256": "2ca9232cf9afd5aa7fbccf670f34590649b1a1d36e0a7536af380c7d93fb898e"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_left_20260831_133418.txt",
+      "sha256": "674b2c043d28cfc01b1eafab161ca680613b16bb3a4dc1614c10ddd308cd322d"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_left_20260901_155513.csv",
+      "sha256": "9b165864860894f3474ea9e5e0fbd83590e8d38cc74aa74cb2495866cf27a2d4"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_left_20260901_155513.txt",
+      "sha256": "aacb2291a46a1248f1ce3bec547c85ac492d2acaee42c004d9bbfc8b79d95044"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_left_20260901_155622.csv",
+      "sha256": "dd797b67584ec7c2e5203ce06252983ea6122f368db784e46707fae008fb626a"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_left_20260901_155622.txt",
+      "sha256": "cbe29af86972e660385b2a047ed363f77522aba3f19562fa3de0f759d81897f8"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_right_20260831_112252.csv",
+      "sha256": "e541c463649f5e8fb50408e2817325f3ecb8c8b048d430dacb10bbacf5707b44"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_right_20260831_112252.txt",
+      "sha256": "3ef2230a3cc58068b92064d8ed13b3b7e8c20dd4012d1cc27c975b16a5d8247c"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_right_20260831_140233.csv",
+      "sha256": "6ecfd09e6dc61fd8613a47ef76a98bfc09d5502cca70794eff32ac0abb02b2cf"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_right_20260831_140233.txt",
+      "sha256": "be1f0b429d4eca001405ea93dd29c4abb0787c212d3027fcf47ae8fad2c149a9"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_right_20260901_155852.csv",
+      "sha256": "eed400690888c47bb9fdd828f9e0ef5066b0e7f9cb8519ae5002d47b575ae1e5"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_right_20260901_155852.txt",
+      "sha256": "177b6867987650631bd6f77d658906d9d2f2e8124a6dd42011b97b3c34271cd5"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_right_20260901_160008.csv",
+      "sha256": "8c3aada6f555a4da916825c5d980a872118f67bcdf27467c2a9bad28436de344"
+    },
+    {
+      "path": "data/train_data/imu_YJ_knock_twice_right_20260901_160008.txt",
+      "sha256": "308ef0231ade57b0d6f212edd218c441980cd902392bd573bcb846cdebe8d5b9"
+    },
+    {
+      "path": "data/train_data/imu_YJ_shake_phone_20260901_160454.csv",
+      "sha256": "4d1d586fa1f78a37dcf8e265fd622fac814e3b57bdbc118297be12ecb3390b75"
+    },
+    {
+      "path": "data/train_data/imu_YJ_shake_phone_20260901_160454.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/train_data/imu_YYQ_knock_twice_left_20260904_095856.csv",
+      "sha256": "981e96d46629b6cf569dbf9194989d9092fbe4ba79a888413f2d1d655d5518c0"
+    },
+    {
+      "path": "data/train_data/imu_YYQ_knock_twice_left_20260904_095856.txt",
+      "sha256": "a771ade410d6cdc84b101fd7b2ce8ddbc67bb21a2987aa77361c2b7759d16f3c"
+    },
+    {
+      "path": "data/train_data/imu_YYQ_knock_twice_right_20260904_095740.csv",
+      "sha256": "735c8b726592392973c247e46ae8f244c037a874cef844130959c95d581f2420"
+    },
+    {
+      "path": "data/train_data/imu_YYQ_knock_twice_right_20260904_095740.txt",
+      "sha256": "b62ccb0102f61ca5a52750d9a1da856398c5351846f6a0280847e04d314abb1d"
+    },
+    {
+      "path": "data/train_data/imu_Ym_knock_twice_left_20260904_111043.csv",
+      "sha256": "60fa8a6c00e44132b23107e6dc5a156d5639eaaf0f14a6489522642fd539ad01"
+    },
+    {
+      "path": "data/train_data/imu_Ym_knock_twice_left_20260904_111043.txt",
+      "sha256": "05e628fc894f27df9532ac69e188945404206acd9ad5ebb74cd0e87f21846421"
+    },
+    {
+      "path": "data/train_data/imu_Ym_knock_twice_right_20260904_110925.csv",
+      "sha256": "2d743eb71f96b1c452c5d1662066a131e9d640ad2238eeba083b409e45ef29ac"
+    },
+    {
+      "path": "data/train_data/imu_Ym_knock_twice_right_20260904_110925.txt",
+      "sha256": "33e1ac53c80142da824e486ee62ef974e730162618741bb759e7d4073ef533e0"
+    },
+    {
+      "path": "data/train_data/imu_ZR_pick_place_20260909_091335.csv",
+      "sha256": "ab1e9d8b34b851774c4b0b25584dd2858a8b7addd8129bc11e4977c148899543"
+    },
+    {
+      "path": "data/train_data/imu_ZR_pick_place_20260909_091335.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/train_data/imu_ZR_shake_phone_20260908_175719.csv",
+      "sha256": "0e0724400758dd7c2d34da8935cdd0695508359eaa68841fa1c2840072941fdb"
+    },
+    {
+      "path": "data/train_data/imu_ZR_shake_phone_20260908_175719.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/train_data/imu_ZR_shake_phone_20260909_091204.csv",
+      "sha256": "ddb119fafd511104bf9ca65d84ecaf17bdc9e4c7a30c5370cc33f3efd2489097"
+    },
+    {
+      "path": "data/train_data/imu_ZR_shake_phone_20260909_091204.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/train_data/imu_ZR_switch_hand_20260909_092838.csv",
+      "sha256": "c54c57d61c8de247b54a1216c7b67c68a9b886e7d703e35901ef4144252a517c"
+    },
+    {
+      "path": "data/train_data/imu_ZR_switch_hand_20260909_092838.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/valid_data/imu_CC_adjust_grip_20260901_154104.csv",
+      "sha256": "0d3c2057dc0b8846da2c07edecb6c4c780a33a0886cbaddecb9010d5aeb629cc"
+    },
+    {
+      "path": "data/valid_data/imu_CC_adjust_grip_20260901_154104.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/valid_data/imu_CC_knock_once_20260901_153844.csv",
+      "sha256": "5012c05580a5540dd14b79bfe3d4cad2c8c8a7877a3ea59e6e46557d36b74060"
+    },
+    {
+      "path": "data/valid_data/imu_CC_knock_once_20260901_153844.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/valid_data/imu_CC_shake_phone_20260901_154507.csv",
+      "sha256": "3a11a2d3a9f148ab3230fb3367e4dd9b29a7602c16d062bb3d10202f24e7be3f"
+    },
+    {
+      "path": "data/valid_data/imu_CC_shake_phone_20260901_154507.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/valid_data/imu_TY_arbitrary_20260831_141803.csv",
+      "sha256": "da1a9c7d8c07005c21b32dffee7ceb2f0ff9eb937e19f54c296c9b72034911da"
+    },
+    {
+      "path": "data/valid_data/imu_TY_arbitrary_20260831_141803.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/valid_data/imu_YJ_pick_place_20260901_160605.csv",
+      "sha256": "3f0edf9a26327a4af85dce9cbf7004aa1c25926ea0a6ee536d9ed530a5e17ec2"
+    },
+    {
+      "path": "data/valid_data/imu_YJ_pick_place_20260901_160605.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/valid_data/imu_YJ_switch_hand_20260901_161017.csv",
+      "sha256": "af651542ccffc9c53dfed5e41994b77b01041ebb4b9a74a568c014339ac092e1"
+    },
+    {
+      "path": "data/valid_data/imu_YJ_switch_hand_20260901_161017.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/valid_data/imu_ZR_knock_twice_right_20260831_105143.csv",
+      "sha256": "0832c1a5e806b56a6af2fcea1c9c43bca692cbeafd946090d6d395ab813b8195"
+    },
+    {
+      "path": "data/valid_data/imu_ZR_knock_twice_right_20260831_105143.txt",
+      "sha256": "627a2898a8959ca10233240b2dfe36fd909ba59ed0b250e314bc4f93181137f7"
+    },
+    {
+      "path": "data/valid_data/imu_ZR_knock_twice_right_20260831_111010.csv",
+      "sha256": "9401cc71acc8bc4bd2c1251b39ecaeb83b11ca9b7c9c008bf3dc3aa23e3d308a"
+    },
+    {
+      "path": "data/valid_data/imu_ZR_knock_twice_right_20260831_111010.txt",
+      "sha256": "859f5c9d143a5269d702164a959db7d42b507bb3149e0d4aa600a77413b2fe23"
+    },
+    {
+      "path": "data/valid_data/imu_ZR_shake_phone_20260904_102826.csv",
+      "sha256": "9775d0b50a859c8234ed021fb2ea88f3190e84fa3ec2579d609a0a3681e85b3c"
+    },
+    {
+      "path": "data/valid_data/imu_ZR_shake_phone_20260904_102826.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/valid_data/imu_yzj_knock_twice_left_20260904_095015.csv",
+      "sha256": "fac9961bfc4577146213f0f3e71094f20044a7678af5794e0f86381de3ae21bc"
+    },
+    {
+      "path": "data/valid_data/imu_yzj_knock_twice_left_20260904_095015.txt",
+      "sha256": "a0695ff69488d033915c5164799ed635438ddce1a3756ae8a7afa3dcc8abaaf3"
+    },
+    {
+      "path": "data/valid_data/imu_yzj_knock_twice_right_20260904_095127.csv",
+      "sha256": "091459637be34d9f8d5f8bbe9de68aba6ffd2d47eb075d517daae5bbbd9ad15e"
+    },
+    {
+      "path": "data/valid_data/imu_yzj_knock_twice_right_20260904_095127.txt",
+      "sha256": "59163c40ee7b84147a146751672555a8c7b2d50e3f5b191654bb13fdd96f2094"
+    }
+  ],
+  "code": [
+    {
+      "path": "train.py",
+      "sha256": "77c87af850bde08ef33b77c0b73e62b1794376737f52d5c2cbe771f902381789"
+    },
+    {
+      "path": "notebooks/state_reset_analysis.py",
+      "sha256": "22c2bb362af75f4f2407da7e2cd6e772b33efd50081795120b219bd3bb87395c"
+    },
+    {
+      "path": "tap_recognition/__init__.py",
+      "sha256": "5f7a411b668fa8688b4bdcce2e8f44cf86c83683b0a8c8dc7ec66268e5868684"
+    },
+    {
+      "path": "tap_recognition/config.py",
+      "sha256": "277f2a5ea748fbf4bd4bc568bd9e224075d8956931d4bc3db7e43b26883b2c08"
+    },
+    {
+      "path": "tap_recognition/dataset.py",
+      "sha256": "57f2f90f75fc2117a12b30fd662f3cff881e0d900ab693401f2fed6723be8084"
+    },
+    {
+      "path": "tap_recognition/inference.py",
+      "sha256": "8556719820907f10393a4590021be8b3c9d843bb9fe2502a74ddd983eba541f8"
+    },
+    {
+      "path": "tap_recognition/labels.py",
+      "sha256": "6b64f2752cfa1bc1f59f3438966413040cdd3f336bc4199b91d1a51419634049"
+    },
+    {
+      "path": "tap_recognition/model.py",
+      "sha256": "4b6b97b292e070965488afeed2f42f4152a7736b5d93fb568e4efbdb7c990ad8"
+    },
+    {
+      "path": "tap_recognition/physics.py",
+      "sha256": "06df295ec7decacf0d2fb13da3eafab2fa632eeba7dd87bb242dabf6d488e39c"
+    },
+    {
+      "path": "tap_recognition/recording.py",
+      "sha256": "3cd648408f0a494a818e8e7e0efebfc5da8f3710264016acba9c88f67da0be7a"
+    }
+  ],
+  "results": [
+    {
+      "path": "audit.csv",
+      "sha256": "7af5edccb02547e70a36f6982bf90a4cb689c74225f50c7147a77d1f06775dab"
+    },
+    {
+      "path": "bootstrap.csv",
+      "sha256": "884e635778e23fa4b4b3a6b9b494fde5a406b1cd2a5fa97500b760c5fff63632"
+    },
+    {
+      "path": "by_action.csv",
+      "sha256": "d9f04d7cbf2050607a90bc0de4f73642d0cc0a5938fa252c458653cf6a47a3e3"
+    },
+    {
+      "path": "changed_decisions.csv",
+      "sha256": "8613f0a37b69b3130e67fd88f8338457fbf19bed08e6b79aedbecc4e0f2ddb96"
+    },
+    {
+      "path": "checkpoint_metric_comparison.csv",
+      "sha256": "e795187b45448012d2841132d4b7ab9c0a2843f6a92ab63bb78732c11b3671ac"
+    },
+    {
+      "path": "event_identity_comparison.csv",
+      "sha256": "6f918f90a9e832d8e0430c25844b07e515b4d01e60273d509b9bcc7b5d64d6db"
+    },
+    {
+      "path": "legacy_300_frame.csv",
+      "sha256": "91ce9fe8afbce4f38773b460eb770033e4a6e6b02cfeb01c6e822a17f77702db"
+    },
+    {
+      "path": "numerical_checks.csv",
+      "sha256": "74587f6d2b5747780581ec55685afcc72be35509f6c669fceb61abd67aea0c3d"
+    },
+    {
+      "path": "per_recording.csv",
+      "sha256": "b8ef2c7363faa6bcd82a89250af31499eab78ff8a141e1c6c02976ce19956aeb"
+    },
+    {
+      "path": "per_segment.csv",
+      "sha256": "d0a747ffeb590dfde99755438f2ad60545ab1ffeb71e091f550a918ac6cc3c89"
+    },
+    {
+      "path": "predicted_events.csv",
+      "sha256": "c25bbadd9061122dfab1d7277ec2146b9e4b9b573efa363da39f0ccc936ff2fe"
+    },
+    {
+      "path": "probability_differences.csv",
+      "sha256": "e27eb2f36a9f926f5247b72bd37cae2e52abf8ba8e6fc98ea48c7f8dde5730d4"
+    },
+    {
+      "path": "sensitivity.csv",
+      "sha256": "75dde2e8083678d9bac43d0768da9663812dd282074e5aa73447c5f4a0128fcd"
+    },
+    {
+      "path": "summary.csv",
+      "sha256": "a6c2b7880bccb6608d0af84ba6ad3fc7cf12c51d9060d581490279c818873574"
+    }
+  ],
+  "notebook_source_sha256": "e713a79a88db7cff781a1386c4162cd7226308f6e003d066f492f12272a38320"
+}

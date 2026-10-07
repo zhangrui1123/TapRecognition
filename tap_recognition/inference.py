@@ -13,7 +13,7 @@ import numpy as np
 import torch
 
 from .labels import confirm_prior_tap
-from .model import CausalCNNGRU
+from .model_factory import build_model
 from .physics import IMUSimulator
 
 
@@ -166,12 +166,12 @@ class RunningNormalizer:
 
 class OnlineDoubleTapDetector:
     """
-    Streaming detector wrapping CausalCNNGRU with preprocessing and hysteresis.
+    Streaming detector wrapping a causal recurrent model with preprocessing and hysteresis.
     """
 
     def __init__(
         self,
-        model: CausalCNNGRU,
+        model: torch.nn.Module,
         config: DetectorConfig | None = None,
         device: str = "cpu",
     ):
@@ -179,7 +179,7 @@ class OnlineDoubleTapDetector:
         self.config = config or DetectorConfig()
         self.device = torch.device(device)
 
-        self._h: torch.Tensor | None = None
+        self._h: torch.Tensor | tuple[torch.Tensor, torch.Tensor] | None = None
         self._cnn_buffer: torch.Tensor | None = None
         self._hp = TrainingHighPass()
         self._acc_hp: list[np.ndarray] = []
@@ -285,7 +285,7 @@ def load_detector(checkpoint_path: str, device: str = "cpu") -> OnlineDoubleTapD
     cfg = dict(ckpt.get("model_config", {}))
     if "dilations" in cfg:
         cfg["dilations"] = tuple(cfg["dilations"])
-    model = CausalCNNGRU(**cfg)
+    model = build_model(cfg, ckpt.get("model_type")).to(device)
     model.load_state_dict(ckpt["model_state"])
     return OnlineDoubleTapDetector(model, device=device)
 

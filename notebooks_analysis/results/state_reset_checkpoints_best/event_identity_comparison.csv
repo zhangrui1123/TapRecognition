@@ -1,0 +1,3 @@
+split,identical_frame_and_class,only_in_reset,only_in_continuous
+train,496,6,3
+valid,109,0,0

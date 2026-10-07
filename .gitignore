@@ -22,6 +22,7 @@ tools/mingw730/
 
 # Keep labeled train/val recordings; ignore other data folders
 data/*
+!data/session_exclusions.csv
 !data/train_data/
 !data/train_data/**
 !data/valid_data/
@@ -34,3 +35,6 @@ demo_outputs/
 # Virtual env
 .venv/
 venv/
+
+# Windows download-origin metadata copied as invalid filenames outside NTFS.
+*:Zone.Identifier

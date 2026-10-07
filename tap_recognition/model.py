@@ -102,6 +102,40 @@ class CausalCNNGRU(nn.Module):
     def receptive_field(self) -> int:
         return self._receptive_field
 
+    def _gru_one_step(
+        self, x: torch.Tensor, h: torch.Tensor | None
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Run the GRU gates for one frame with the weights from self.gru.
+
+        Explicit gates avoid an ONNX GRU operator whose MindSpore Lite
+        conversion does not reproduce the recurrent state of PyTorch's GRU.
+        """
+        if h is None:
+            h = x.new_zeros(self.gru_layers, x.shape[0], self.gru_hidden)
+
+        next_states = []
+        for layer in range(self.gru_layers):
+            prev = h[layer]
+            input_gates = F.linear(
+                x,
+                getattr(self.gru, f"weight_ih_l{layer}"),
+                getattr(self.gru, f"bias_ih_l{layer}"),
+            )
+            hidden_gates = F.linear(
+                prev,
+                getattr(self.gru, f"weight_hh_l{layer}"),
+                getattr(self.gru, f"bias_hh_l{layer}"),
+            )
+            ir, iz, inn = input_gates.chunk(3, dim=-1)
+            hr, hz, hn = hidden_gates.chunk(3, dim=-1)
+            reset = torch.sigmoid(ir + hr)
+            update = torch.sigmoid(iz + hz)
+            candidate = torch.tanh(inn + reset * hn)
+            x = (1.0 - update) * candidate + update * prev
+            next_states.append(x)
+
+        return x.unsqueeze(1), torch.stack(next_states)
+
     def forward(
         self,
         x: torch.Tensor,
@@ -133,12 +167,14 @@ class CausalCNNGRU(nn.Module):
         cnn_buffer: torch.Tensor | None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Process a single time step for online inference.
+        Process a single time step for online inference (model.eval()).
 
         Args:
             x_t: [B, 1, F] or [B, F] — one IMU sample
             h:   [L, B, H] GRU state
-            cnn_buffer: [B, C, R] past projected samples for causal conv
+            cnn_buffer: [B, C, R] packed input histories for each conv block;
+                block i stores (kernel_size - 1) * dilation_i frames.
+                The final slot is reserved to keep the exported state shape.
 
         Returns:
             prob: [B, 1, C] softmax P(none, left, right)
@@ -152,17 +188,34 @@ class CausalCNNGRU(nn.Module):
                 f"step() expects x_t shape [B, 1, F] or [B, F], got {tuple(x_t.shape)}"
             )
 
-        b = x_t.shape[0]
-        proj = self.input_proj(x_t[:, 0, :]).unsqueeze(1)  # [B, 1, C]
-        c = proj.shape[-1]
-        r = self._receptive_field
+        proj = self.input_proj(x_t).transpose(1, 2)  # [B, C, 1]
 
         if cnn_buffer is None:
-            cnn_buffer = torch.zeros(b, c, r, device=x_t.device, dtype=x_t.dtype)
+            cnn_buffer = proj.new_zeros(
+                proj.shape[0], proj.shape[1], self._receptive_field
+            )
 
-        buffer_new = torch.cat([cnn_buffer[:, :, 1:], proj.transpose(1, 2)], dim=2)
-        cnn_out = self.cnn(buffer_new).transpose(1, 2)  # [B, 1, C]
-        gru_out, h_new = self.gru(cnn_out, h)
-        logit = self.head(gru_out[:, -1:, :])  # [B, 1, num_classes]
+        # A conv block needs its *own input* history: replaying projected input
+        # through the whole CNN would invent outputs before the first sample.
+        # Keeping the histories separately reproduces forward()'s left padding.
+        current = proj
+        offset = 0
+        histories = []
+        for block in self.cnn:
+            n_past = block.conv.left_pad
+            if n_past:
+                past = cnn_buffer[:, :, offset : offset + n_past]
+                histories.append(torch.cat([past[:, :, 1:], current], dim=2))
+                current = block(torch.cat([past, current], dim=2))[:, :, -1:]
+            else:
+                current = block(current)
+            offset += n_past
+
+        # One reserved slot preserves the [B, C, receptive_field] I/O of the
+        # existing ONNX/MindSpore step model and its HarmonyOS caller.
+        buffer_new = torch.cat([*histories, cnn_buffer[:, :, -1:]], dim=2)
+        cnn_out = self.dropout(current.transpose(1, 2))  # [B, 1, C]
+        gru_out, h_new = self._gru_one_step(cnn_out[:, 0, :], h)
+        logit = self.head(gru_out)  # [B, 1, num_classes]
         prob = torch.softmax(logit, dim=-1)
         return prob, h_new, buffer_new

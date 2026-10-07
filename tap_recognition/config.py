@@ -21,6 +21,7 @@ class DataConfig:
     exclusion_margin: int = 200
     dt_min: float = 0.12
     dt_max: float = 0.45
+    session_exclusions_file: str = "data/session_exclusions.csv"
     synthetic_samples: int = 8000
     val_split: float = 0.15
 
@@ -64,6 +65,30 @@ class ModelConfig:
 
 
 @dataclass
+class LSTMModelConfig:
+    input_dim: int = 6
+    num_classes: int = 3
+    cnn_channels: int = 32
+    lstm_hidden: int = 64
+    lstm_layers: int = 1
+    kernel_size: int = 5
+    dilations: tuple[int, ...] = (1, 2, 4)
+    dropout: float = 0.1
+
+    def to_model_kwargs(self) -> dict[str, Any]:
+        return {
+            "input_dim": self.input_dim,
+            "num_classes": self.num_classes,
+            "cnn_channels": self.cnn_channels,
+            "lstm_hidden": self.lstm_hidden,
+            "lstm_layers": self.lstm_layers,
+            "kernel_size": self.kernel_size,
+            "dilations": self.dilations,
+            "dropout": self.dropout,
+        }
+
+
+@dataclass
 class EarlyStoppingConfig:
     enabled: bool = True
     patience: int = 10
@@ -94,7 +119,7 @@ class TrainConfig:
     freeze_except_last: bool = False
     data: DataConfig = field(default_factory=DataConfig)
     labels: LabelConfig = field(default_factory=LabelConfig)
-    model: ModelConfig = field(default_factory=ModelConfig)
+    model: ModelConfig | LSTMModelConfig = field(default_factory=ModelConfig)
     training: TrainingConfig = field(default_factory=TrainingConfig)
 
     def to_dict(self) -> dict[str, Any]:

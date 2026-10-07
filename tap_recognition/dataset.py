@@ -27,6 +27,52 @@ class RecordedWindowMeta:
     trigger_frame: int | None = None
 
 
+@dataclass(frozen=True)
+class SessionExclusion:
+    """One raw CSV segment omitted from training and evaluation."""
+
+    source_file: str
+    segment_index: int
+    reason: str
+
+
+def load_session_exclusions(
+    exclusions_file: str | Path | None,
+) -> list[SessionExclusion]:
+    """Load the shared CSV exclusion registry, if configured."""
+    if exclusions_file is None:
+        return []
+    path = Path(exclusions_file)
+    if not path.exists():
+        return []
+
+    with path.open(encoding="utf-8-sig", newline="") as f:
+        rows = csv.DictReader(f)
+        required = {"source_file", "segment_index", "reason"}
+        if rows.fieldnames is None or not required <= set(rows.fieldnames):
+            raise ValueError(f"{path} must contain columns: {', '.join(sorted(required))}")
+
+        exclusions: list[SessionExclusion] = []
+        seen: set[tuple[str, int]] = set()
+        for line, row in enumerate(rows, start=2):
+            source_file = Path(row["source_file"].strip()).name
+            reason = row["reason"].strip()
+            if not source_file or not reason:
+                raise ValueError(f"{path}:{line} requires source_file and reason")
+            try:
+                segment_index = int(row["segment_index"])
+            except ValueError as exc:
+                raise ValueError(f"{path}:{line} has invalid segment_index") from exc
+            if segment_index < 0:
+                raise ValueError(f"{path}:{line} has negative segment_index")
+            key = (source_file, segment_index)
+            if key in seen:
+                raise ValueError(f"{path}:{line} duplicates {source_file} segment {segment_index}")
+            seen.add(key)
+            exclusions.append(SessionExclusion(source_file, segment_index, reason))
+    return exclusions
+
+
 def load_trigger_frames(label_path: Path) -> list[int]:
     return [frame for frame, _cls in load_trigger_events(label_path)]
 
@@ -85,6 +131,26 @@ def load_segment_row_bounds(csv_path: Path) -> list[tuple[int, int]]:
     return bounds
 
 
+def load_indexed_segment_row_bounds(csv_path: Path) -> list[tuple[int, int, int]]:
+    """Return (segment_index, start, end) for contiguous CSV segment runs."""
+    with csv_path.open(encoding="utf-8-sig", newline="") as f:
+        rows = list(csv.DictReader(f))
+    if not rows or "segment_index" not in rows[0]:
+        return []
+
+    bounds: list[tuple[int, int, int]] = []
+    start = 0
+    current = int(rows[0]["segment_index"])
+    for i, row in enumerate(rows):
+        segment_index = int(row["segment_index"])
+        if segment_index != current:
+            bounds.append((current, start, i))
+            start = i
+            current = segment_index
+    bounds.append((current, start, len(rows)))
+    return bounds
+
+
 class IMUDoubleTapDataset(Dataset):
     def __init__(
         self,
@@ -137,6 +203,7 @@ class RecordedIMUDataset(Dataset):
         dt_max: float = 0.45,
         seed: int = 42,
         csv_paths: Sequence[str | Path] | None = None,
+        session_exclusions_file: str | Path | None = None,
     ):
         self.window_samples = window_samples
         self.label_params = label_params or LabelParams()
@@ -153,6 +220,12 @@ class RecordedIMUDataset(Dataset):
         )
         self.samples: list[tuple[np.ndarray, np.ndarray, int]] = []
         self.window_meta: list[RecordedWindowMeta] = []
+        self.session_exclusions = load_session_exclusions(session_exclusions_file)
+        self._excluded_by_file: dict[str, set[int]] = {}
+        for exclusion in self.session_exclusions:
+            self._excluded_by_file.setdefault(exclusion.source_file, set()).add(
+                exclusion.segment_index
+            )
 
         csv_files = sorted(
             p for p in Path(data_dir).glob("*.csv") if not p.name.endswith(".labels.csv")
@@ -172,9 +245,30 @@ class RecordedIMUDataset(Dataset):
             label_path = csv_path.with_suffix(".txt")
             trigger_events = load_trigger_events(label_path)
             trigger_frames = [frame for frame, _cls in trigger_events]
-            segments = load_segment_row_bounds(csv_path)
+            indexed_segments = load_indexed_segment_row_bounds(csv_path)
+            excluded = self._excluded_by_file.get(csv_path.name, set())
+            if indexed_segments:
+                available = {segment_index for segment_index, _start, _end in indexed_segments}
+                unknown = excluded - available
+                if unknown:
+                    raise ValueError(
+                        f"{csv_path.name} does not contain excluded segment(s): {sorted(unknown)}"
+                    )
+                if excluded:
+                    print(f"  Excluding session(s) {sorted(excluded)} from {csv_path.name}")
+                segments = [
+                    (start, end)
+                    for segment_index, start, end in indexed_segments
+                    if segment_index not in excluded
+                ]
+            else:
+                if excluded:
+                    raise ValueError(
+                        f"{csv_path.name} has exclusions but no segment_index column"
+                    )
+                segments = []
 
-            if segments:
+            if indexed_segments:
                 self._add_segment_windows(
                     csv_path.name, imu, segments, trigger_events
                 )

@@ -1,0 +1,13 @@
+file,check,max_logit_error,passed,max_probability_error,mean_probability_error
+imu_CC_knock_twice_left_20260901_153013.csv,"correct streaming, chunk=1",1.430511474609375e-06,True,,
+imu_CC_knock_twice_left_20260901_153013.csv,"correct streaming, chunk=7",1.3113021850585938e-06,True,,
+imu_CC_knock_twice_left_20260901_153013.csv,"correct streaming, chunk=53",1.430511474609375e-06,True,,
+imu_CC_knock_twice_left_20260901_153013.csv,"correct streaming, chunk=300",1.430511474609375e-06,True,,
+imu_CC_knock_twice_left_20260901_153013.csv,future perturbation,0.0,True,,
+imu_CC_knock_twice_left_20260901_153013.csv,existing step() diagnostic (not an equivalence assertion),,,0.2620519995689392,0.004317604936659336
+imu_CC_arbitrary_20260901_154914.csv,"correct streaming, chunk=1",1.8477439880371094e-06,True,,
+imu_CC_arbitrary_20260901_154914.csv,"correct streaming, chunk=7",1.6689300537109375e-06,True,,
+imu_CC_arbitrary_20260901_154914.csv,"correct streaming, chunk=53",1.7285346984863281e-06,True,,
+imu_CC_arbitrary_20260901_154914.csv,"correct streaming, chunk=300",1.7881393432617188e-06,True,,
+imu_CC_arbitrary_20260901_154914.csv,future perturbation,0.0,True,,
+imu_CC_arbitrary_20260901_154914.csv,existing step() diagnostic (not an equivalence assertion),,,0.19161510467529297,0.00207031168974936

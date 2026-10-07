@@ -1,4 +1,4 @@
-"""Training script for causal CNN + GRU double-tap detector."""
+"""Training script for causal CNN + GRU/LSTM double-tap detectors."""
 
 from __future__ import annotations
 
@@ -10,12 +10,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 
-from tap_recognition.config import EarlyStoppingConfig, TrainConfig
+from tap_recognition.config import (
+    EarlyStoppingConfig,
+    LSTMModelConfig,
+    ModelConfig,
+    TrainConfig,
+)
 from tap_recognition.dataset import IMUDoubleTapDataset, RecordedIMUDataset
-from tap_recognition.model import CausalCNNGRU
+from tap_recognition.model_factory import build_model
+from tap_recognition.model_lstm import CausalCNNLSTM
 
 
-def freeze_except_last_layer(model: CausalCNNGRU) -> int:
+def freeze_except_last_layer(model: nn.Module) -> int:
     """Freeze all weights except the final Linear in ``model.head``."""
     for param in model.parameters():
         param.requires_grad = False
@@ -103,6 +109,7 @@ def _recorded_dataset(
                 dt_min=data.dt_min,
                 dt_max=data.dt_max,
                 seed=seed + i,
+                session_exclusions_file=data.session_exclusions_file,
             )
         )
     return parts[0] if len(parts) == 1 else ConcatDataset(parts)
@@ -154,7 +161,7 @@ def build_datasets(cfg: TrainConfig) -> tuple[Dataset, Dataset]:
 
 
 def train_one_epoch(
-    model: CausalCNNGRU,
+    model: nn.Module,
     loader: DataLoader,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
@@ -216,7 +223,7 @@ def train_one_epoch(
 
 @torch.no_grad()
 def evaluate(
-    model: CausalCNNGRU,
+    model: nn.Module,
     loader: DataLoader,
     device: torch.device,
     threshold: float,
@@ -350,11 +357,15 @@ def train(cfg: TrainConfig) -> float:
         if "dilations" in loaded:
             loaded["dilations"] = tuple(loaded["dilations"])
         model_kwargs = loaded
-        model = CausalCNNGRU(**model_kwargs).to(device)
+        model = build_model(model_kwargs, ckpt.get("model_type")).to(device)
         model.load_state_dict(ckpt["model_state"])
         print(f"Initialized weights from {cfg.init_checkpoint}")
     else:
-        model = CausalCNNGRU(**model_kwargs).to(device)
+        model = build_model(model_kwargs).to(device)
+
+    model_type = "lstm" if isinstance(model, CausalCNNLSTM) else "gru"
+    config_class = LSTMModelConfig if model_type == "lstm" else ModelConfig
+    cfg.model = config_class(**model_kwargs)
 
     if cfg.freeze_except_last:
         n_last = freeze_except_last_layer(model)
@@ -434,6 +445,7 @@ def train(cfg: TrainConfig) -> float:
             torch.save(
                 {
                     "model_state": model.state_dict(),
+                    "model_type": model_type,
                     "model_config": model_kwargs,
                     "train_config": cfg.to_dict(),
                     "epoch": epoch,
@@ -453,6 +465,7 @@ def train(cfg: TrainConfig) -> float:
     torch.save(
         {
             "model_state": model.state_dict(),
+            "model_type": model_type,
             "model_config": model_kwargs,
             "train_config": cfg.to_dict(),
             "epoch": stopped_epoch,
@@ -471,6 +484,18 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--out-dir", default=None)
     parser.add_argument(
+        "--recurrent-type", choices=("gru", "lstm"), default="gru",
+        help="Recurrent architecture for training from scratch (default: gru)",
+    )
+    parser.add_argument(
+        "--recurrent-hidden", type=int, default=None,
+        help="Hidden size for the selected architecture (default: 64)",
+    )
+    parser.add_argument(
+        "--recurrent-layers", type=int, default=None,
+        help="Recurrent layer count (default: 1)",
+    )
+    parser.add_argument(
         "--freeze-except-last",
         action="store_true",
         help="Train only the final Linear layer",
@@ -488,6 +513,12 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = TrainConfig()
+    if args.recurrent_type == "lstm":
+        cfg.model = LSTMModelConfig()
+    if args.recurrent_hidden is not None:
+        setattr(cfg.model, f"{args.recurrent_type}_hidden", args.recurrent_hidden)
+    if args.recurrent_layers is not None:
+        setattr(cfg.model, f"{args.recurrent_type}_layers", args.recurrent_layers)
     if args.init_checkpoint:
         cfg.init_checkpoint = args.init_checkpoint
     if args.lr is not None:

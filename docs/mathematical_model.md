@@ -241,9 +241,9 @@ Metadata is used for stratified evaluation, not as a hard training class label.
 
 **Window length** follows from physical timescales (Section 7.2): $T = 64$ samples at $f_s = 100$ Hz (640 ms) covers the full double-tap envelope ($T_{\max} + 2 \times$ ring-down).
 
-### 5.7 Recorded Data: Annotation and Window Extraction
+### 5.7 Recorded Data: Auto-Labeling and Window Extraction
 
-Collected IMU recordings use a complementary pipeline implemented in `tools/label_imu.py` and `tap_recognition/dataset.py`.
+Collected IMU recordings use `tools/auto_label_imu.py` and `tap_recognition/dataset.py`. The detailed operational workflow, including strict collection windows and human review, is in [data-collection-and-labeling.md](data-collection-and-labeling.md).
 
 #### 5.7.1 CSV format
 
@@ -259,47 +259,44 @@ Each recording is a CSV with columns:
 
 Frame indices used in labels are **global row indices** over the full CSV (0 to $N-1$), matching the contiguous timeline shown in the labeling GUI.
 
-#### 5.7.2 Interactive trigger annotation
+#### 5.7.2 Segment-aware second-tap auto-labeling
 
-Human annotators mark the **second tap** in each double-tap gesture. The GUI computes energy features:
-
-$$
-E_{\text{acc},\Delta}(n) = \bigl| \lVert \mathbf{a}_n \rVert - \lVert \mathbf{a}_{n-1} \rVert \bigr|, \qquad
-E_{\text{gyro}}(n) = \lVert \boldsymbol{\omega}_n \rVert
-$$
-
-For each user-selected span $[n_{\min}, n_{\max}]$, the trigger frame is:
+The auto-labeler finds a pair of accelerometer-energy peaks independently in each collection segment. It computes:
 
 $$
-n_2 = \arg\min_{n \in [n_{\min}, n_{\max}]} \hat{E}_{\text{gyro}}(n)
+E_{\text{acc},\Delta}(n) = \bigl| \lVert \mathbf{a}_n \rVert - \lVert \mathbf{a}_{n-1} \rVert \bigr|
 $$
 
-where $\hat{E}_{\text{gyro}}$ is min–max normalized within the span. This picks the gyro energy trough associated with the second impact transient.
+Candidate local peaks must form an ordered pair $(n_1, n_2)$ with:
+
+$$
+T_{\min} \leq (n_2 - n_1) / f_s \leq T_{\max}
+$$
+
+The highest supported pair is selected. For `imuStrict_*` recordings, the strict collection window additionally requires the first peak after the configured start time and the second peak before the configured end time. This keeps incidental movement outside the participant's instructed interval from becoming a target.
 
 Labels are stored in a sidecar file `<recording>.txt`, one line per event:
 
 ```
-frame_index, action_label
+frame_index, class_id
 ```
 
-with `action_label = 1` for the second tap. Recordings of type `knock_once` or `arbitrary` receive **empty** label files and serve as negative-class sources during training.
+with `class_id = 1` for left and `class_id = 2` for right. Negative recordings receive **empty** label files and serve as negative-class sources during training.
 
 #### 5.7.3 From trigger frames to training windows
 
-`RecordedIMUDataset` converts annotations into fixed-length windows ($T = 64$ samples):
+`RecordedIMUDataset` converts annotations into fixed-length windows ($T = 300$ samples at the current default):
 
 **Positive windows** (from `knock_twice` label files):
 
-1. For each trigger frame $n_2$, extract a window starting at $\max(0,\, n_2 - 48)$.
-2. Estimate the first tap $n_1$ as the peak of $E_{\text{acc},\Delta}(n)$ for $n < n_2$ within the window.
-3. **Filter:** keep the window only if $(n_2 - n_1) / f_s \in [T_{\min}, T_{\max}]$.
-4. Convert the in-window second-tap time: $t_2 = (n_2 - n_{\text{start}}) / f_s$.
-5. Apply Gaussian soft labels (Section 5.4).
+1. For segment-indexed recordings, retain one fitted 300-frame window per non-excluded collection segment; otherwise, center a 300-frame window with 200 frames of pre-trigger context.
+2. Pad short segments by repeating their final IMU frame, or crop long segments while retaining the labeled event.
+3. Convert each in-window second-tap frame into a three-class Gaussian target: none, left, or right.
 
 **Negative windows**:
 
-- From `knock_once` / `arbitrary` recordings (empty labels): random windows with $y_n = 0$.
-- From `knock_twice` recordings: random windows outside an exclusion zone $\pm 80$ frames around each $n_2$.
+- From negative recordings (empty labels): random windows with the `none` class at every frame.
+- From positive recordings: random windows outside the configured 200-frame exclusion margin around each $n_2$.
 
 Each window is high-pass filtered (Section 6.1) before training. The dataset returns:
 
@@ -307,7 +304,7 @@ $$
 \{ \mathbf{y}_{0:T-1},\; \{y_n\}_{n=0}^{T-1},\; \ell_{\text{window}} \}
 $$
 
-where $\ell_{\text{window}} \in \{0, 1\}$ is a hard window-level label (1 if the window contains a labeled second tap).
+where $\ell_{\text{window}} \in \{0, 1, 2\}$ is the hard none/left/right window label.
 
 #### 5.7.4 Train / validation split
 
@@ -315,8 +312,8 @@ Recordings are organized into:
 
 | Directory | Role |
 |-----------|------|
-| `data/train_data/` | Training CSVs + `.txt` labels |
-| `data/valid_data/` | Held-out validation CSVs + `.txt` labels |
+| Configured training directory | Training CSVs + `.txt` labels |
+| Configured validation directory | Held-out validation CSVs + `.txt` labels |
 
 This file-level split avoids leakage across segments from the same session.
 
@@ -334,11 +331,7 @@ A first-order IIR high-pass with cutoff $f_c \approx 0.5$ Hz removes slow orient
 
 ### 6.2 Normalization
 
-Per-channel z-score using running statistics (causal exponential moving average):
-
-$$
-\hat{y}_{n,d} = \frac{y_{n,d} - \mu_{n,d}}{\sigma_{n,d} + \epsilon}, \quad \mu_{n,d} = \alpha \mu_{n-1,d} + (1-\alpha) y_{n,d}
-$$
+The recorded-data pipeline does not apply a separate per-channel running z-score normalizer before the model. The current CNN uses BatchNorm1d after each causal convolution. In evaluation it uses frozen running statistics; its training-time window statistics remain a documented architecture caveat rather than a solved causal-normalization claim.
 
 ### 6.3 Optional Derived Features
 
@@ -349,9 +342,9 @@ This demo uses the raw 6-channel vector after high-pass for simplicity.
 
 ---
 
-## 7. Neural Network: Causal CNN + GRU
+## 7. Neural Network: Causal CNN + Recurrent Head
 
-The model separates two timescales: **local tap transients** (CNN) and **inter-tap timing** (GRU).
+The model separates two timescales: **local tap transients** (CNN) and **inter-tap timing** (GRU or unidirectional LSTM).
 
 ### 7.1 Architecture
 
@@ -361,9 +354,9 @@ $$
 \downarrow \quad & \text{Causal Conv1D} \times L \text{ layers} \\
 & \text{kernel size } k,\ \text{dilation } d_l \\
 & \text{receptive field: } R = 1 + \sum_l (k-1)\,d_l \\
-\downarrow \quad & \text{GRU hidden state } h_n \in \mathbb{R}^H \\
-& h_n = \mathrm{GRU}(c_n,\, h_{n-1}) \\
-\downarrow \quad & \text{Linear} \to \sigma(\text{logit}) \to \hat{p}_n \in (0,1)
+\downarrow \quad & \text{GRU or LSTM recurrent state} \\
+& s_n = \mathrm{RNN}(c_n,\, s_{n-1}) \\
+\downarrow \quad & \text{Linear} \to \operatorname{softmax}(\text{logits}) \to \hat{\mathbf{p}}_n \in [0,1]^3
 \end{aligned}
 $$
 
@@ -371,7 +364,7 @@ $$
 |-----------|---------------|
 | Causal Conv1D | Detect impulse + ring-down of each tap (~50–150 ms) |
 | Dilated kernels | Expand receptive field without future leakage |
-| GRU | Remember first tap; recognize second tap within $\Delta t$ window |
+| GRU / LSTM | Remember first tap; recognize second tap within the $\Delta t$ window |
 
 ### 7.2 Receptive Field vs. Physical Timescales
 
@@ -382,23 +375,17 @@ $$
 | Double-tap total duration | 200–600 ms |
 | At $f_s = 100$ Hz | 20–60 samples |
 
-Receptive field $R = 29$ samples ($\approx 290$ ms) covers one tap's ring-down; the GRU carries first-tap information across the inter-tap gap.
+Receptive field $R = 29$ samples ($\approx 290$ ms) covers one tap's ring-down; the recurrent head carries first-tap information across the inter-tap gap.
 
 ### 7.3 Loss Function
 
-Train against **soft labels** $y_n \in [0, 1]$ with weighted binary cross-entropy:
+Train against three-class soft labels $\mathbf{y}_n = (y_{n,0}, y_{n,1}, y_{n,2})$ with weighted soft cross-entropy:
 
 $$
-\mathcal{L} = -\frac{1}{N}\sum_{n} w_n \Bigl[ y_n \log \hat{p}_n + (1 - y_n)\log(1 - \hat{p}_n) \Bigr]
+\mathcal{L} = -\frac{1}{N}\sum_{n} w_n \sum_{c=0}^{2} y_{n,c}\log\operatorname{softmax}(\mathbf{z}_n)_c
 $$
 
-where $w_n$ is an optional per-frame confidence weight. Optional **label smoothing** on top of soft targets:
-
-$$
-y_n \leftarrow (1 - \varepsilon)\, y_n + \varepsilon/2, \quad \varepsilon \approx 0.05
-$$
-
-Avoid relying on class reweighting (`pos_weight`) — the Gaussian label spreads positive mass over several frames, reducing imbalance naturally.
+where $w_n$ raises the event-frame contribution and negative windows receive their configured window weight. The target already blends a Gaussian event neighborhood back into the `none` class; no additional label smoothing is applied.
 
 **Evaluation metrics** should include:
 
@@ -410,7 +397,7 @@ Avoid relying on class reweighting (`pos_weight`) — the Gaussian label spreads
 
 At runtime, maintain:
 
-- GRU hidden state $\mathbf{h}_n$
+- GRU hidden state, or LSTM hidden and cell states
 - Causal conv buffer (past $R$ samples)
 - Preprocessing EMA state
 
@@ -418,18 +405,15 @@ Each new IMU sample triggers one forward step; no re-processing of history requi
 
 ---
 
-## 8. Detection Logic (Hysteresis)
+## 8. Detection Logic
 
-Soft labels are for training only. At inference, convert $\hat{p}_n$ to a hard trigger with hysteresis:
+Soft labels are for training only. At inference, select the higher left/right probability and start a pending alarm when it crosses the selected threshold for the configured number of consecutive frames. The detector then keeps the strongest candidate over a causal look-ahead interval and emits one event after optional prior-tap confirmation.
 
 $$
-\text{trigger} = \begin{cases}
-\text{True} & \text{if } \hat{p}_n > \theta_{\text{on}} \text{ for } K \text{ consecutive frames} \\
-\text{False} & \text{if } \hat{p}_n < \theta_{\text{off}}
-\end{cases}
+\hat{p}_{\mathrm{event},n} = \max(\hat{p}_{n,\mathrm{left}},\hat{p}_{n,\mathrm{right}})
 $$
 
-with $\theta_{\text{on}} = 0.7$, $\theta_{\text{off}} = 0.3$, $K = 2$, and a **refractory period** $T_{\text{ref}} = 500$ ms after a trigger.
+The current selected validation operating point uses a 12-frame look-ahead, left/right thresholds of 0.50/0.50, and a 500 ms refractory period. Thresholds are selected operating-point parameters, not universal constants.
 
 $T_{\text{ref}} > T_{\max}$ ensures one physical double-tap cannot produce multiple triggers (Section 4 constraint).
 
@@ -440,12 +424,12 @@ $T_{\text{ref}} > T_{\max}$ ensures one physical double-tap cannot produce multi
 | Model element | Synthetic data | Recorded data | Network | Training | Inference |
 |---------------|----------------|---------------|---------|----------|-----------|
 | $h(t; t_k, \mathbf{p}_k)$ | `physics.py` simulator | Real chassis response | Causal CNN | — | — |
-| Second tap $t_2$ | Synthesis metadata | `label_imu.py` trigger frames → Gaussian peak | GRU + CNN | BCE vs $y_n$ | Peak pick + hysteresis |
-| $\Delta t$ validity | Hard filter in simulator | Estimated $n_1$ → interval filter | — | Exclude out-of-range windows | — |
-| Single tap / background | $y_n = 0$ in simulator | Empty `.txt` + random negative windows | — | No false positive target | FP rate metric |
-| Causal constraint | Labels from metadata only | Trigger frame → in-window $t_2$ | Left-pad conv + GRU | Per-frame loss | Step-wise GRU state |
-| High-pass (Section 6.1) | `IMUSimulator.highpass` | Same filter in `RecordedIMUDataset` | — | — | Causal one-pole IIR |
-| Window extraction | Fixed 64-sample synthesis | 64-sample crop around $n_2$ | — | `RecordedIMUDataset` | Streaming step |
+| Second tap $t_2$ | Synthesis metadata | `auto_label_imu.py` sidecar frame → three-class Gaussian target | CNN + GRU/LSTM | Soft cross-entropy | Threshold + look-ahead + refractory |
+| $\Delta t$ validity | Hard filter in simulator | Auto-label peak-pair filter | — | Consistent labels only | Prior-tap check when enabled |
+| Single tap / background | $y_n = 0$ in simulator | Empty `.txt` + random negative windows | — | `none` target | False-alarm rate metric |
+| Causal constraint | Labels from metadata only | Trigger frame → in-window $t_2$ | Left-pad conv + recurrent head | Per-frame loss | Step-wise recurrent/CNN state |
+| High-pass (Section 6.1) | `IMUSimulator.highpass` | Same filter in `RecordedIMUDataset` | — | — | Stateful IIR high-pass |
+| Window extraction | Fixed 64-sample synthesis | Fitted 300-sample collection segment/window | — | `RecordedIMUDataset` | Streaming step |
 
 ### Code references
 
@@ -454,9 +438,9 @@ $T_{\text{ref}} > T_{\max}$ ensures one physical double-tap cannot produce multi
 | Synthetic generation | `tap_recognition/physics.py` |
 | Gaussian soft labels | `tap_recognition/labels.py` |
 | CSV loading | `tap_recognition/recording.py`, `tap_recognition/dataset.py` |
-| Interactive annotation | `tools/label_imu.py`, `tools/label_all_imu.py` |
+| Segment-aware auto-labeling | `tools/auto_label_imu.py` |
 | Training datasets | `tap_recognition/dataset.py` (`IMUDoubleTapDataset`, `RecordedIMUDataset`) |
-| Model | `tap_recognition/model.py` |
+| Models | `tap_recognition/model.py`, `tap_recognition/model_lstm.py` |
 | Training loop | `train.py` |
 | Online inference | `tap_recognition/inference.py` |
 
@@ -469,18 +453,18 @@ $T_{\text{ref}} > T_{\max}$ ensures one physical double-tap cannot produce multi
 | Single tap | Damped oscillator + short impulse |
 | Double-tap | Two taps; label Gaussian centered at $t_2$ |
 | IMU observation | 6-DoF + gravity + noise + background |
-| Training target | $y_n = \exp(-(t_n - t_{\text{peak}})^2 / 2\sigma^2)$ |
-| Negative classes | $y_n = 0$ (no second tap) |
+| Training target | Three-class Gaussian target around $t_2$: none / left / right |
+| Negative classes | `none` at every frame |
 | $\Delta t$ constraint | Hard filter: only $[T_{\min}, T_{\max}]$ in training data |
-| Recorded annotation | Sidecar `.txt` trigger frames → in-window Gaussian labels |
+| Recorded annotation | Segment-aware sidecar trigger frames → in-window three-class labels |
 | Detection | Causal $\hat{p}_n = f_\theta(\mathbf{y}_{0:n})$ |
-| Neural net | Causal CNN (local transients) + GRU (inter-tap timing) |
-| Inference | Hysteresis + refractory period on $\hat{p}_n$ |
+| Neural net | Causal CNN (local transients) + GRU or LSTM (inter-tap timing) |
+| Inference | Threshold + look-ahead + refractory period on $\hat{p}_{\mathrm{event}}$ |
 
 This model motivates:
 
 - The synthetic data generator in `tap_recognition/physics.py`
 - Gaussian soft labels in `tap_recognition/labels.py`
 - Recorded-data windowing in `tap_recognition/dataset.py` (`RecordedIMUDataset`)
-- Interactive annotation in `tools/label_imu.py`
-- The network design in `tap_recognition/model.py`
+- Segment-aware auto-labeling in `tools/auto_label_imu.py`
+- The network designs in `tap_recognition/model.py` and `tap_recognition/model_lstm.py`
